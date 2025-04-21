@@ -7,6 +7,34 @@
 
 ---
 
+## 🔐 Código fuente protegido
+
+Por motivos de protección intelectual, el código completo y comentado de esta aplicación está disponible únicamente bajo solicitud.
+
+- El repositorio actual contiene una versión funcional para uso en Streamlit.
+- El archivo `.py` original se encuentra protegido con contraseña y alojado de forma privada.
+
+Si deseas acceso para fines académicos, envía un correo a:
+
+📩 **D12120039@morelia.tecnm.mx**
+
+Incluye en el mensaje:
+- Tu nombre completo
+- Institución
+- Finalidad de uso
+
+La contraseña será compartida únicamente a personas autorizadas.
+
+---
+
+## ⚠️ Licencia
+
+Este proyecto se encuentra bajo licencia **CC BY-NC-ND 4.0**  
+(No comercial / Sin obras derivadas)
+
+🔗 [Ver términos](https://creativecommons.org/licenses/by-nc-nd/4.0/)
+
+
 ##  Descripción
 
 Esta aplicación permite realizar simulaciones cinéticas de crecimiento microbiano, consumo de sustrato, dinámica del oxígeno disuelto y producción de metabolitos secundarios (como antibióticos), usando datos experimentales y modelos matemáticos clásicos aplicados a *Pseudomonas reptilivora B-6bs* en un biorreactor tipo batch.
@@ -57,12 +85,3 @@ streamlit run cinetica_app.py
 
 ---
 
-## ⚠️ Licencia
-
-Este código está protegido bajo la licencia **CC BY-NC-ND 4.0**.
-
-- No se permite el uso comercial.
-- No se permite su modificación o redistribución.
-- El código puede visualizarse únicamente con fines académicos.
-
-🔗 [Ver términos de la licencia](https://creativecommons.org/licenses/by-nc-nd/4.0/)
