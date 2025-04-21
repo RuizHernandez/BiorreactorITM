@@ -3,7 +3,7 @@
 
 **Autor:** Itan Homero Ruiz Hernández  
 **Desarrollado con:** Python + Streamlit
-**Agradecimientos:** Dariana Berenice, Ana Karen, Karitza Barrios, Alexis Soria por su participación en prueba cerrada. 
+**Agradecimientos:** Dariana Berenice, Ana Karen, Karitza Barrios, Alexis Soria por su participación en prueba cerrada 
 
 ---
 
