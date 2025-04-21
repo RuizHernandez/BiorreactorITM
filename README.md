@@ -55,3 +55,14 @@ cd BiorreactorITM
 pip install -r requirements.txt
 streamlit run cinetica_app.py
 
+---
+
+## ⚠️ Licencia
+
+Este código está protegido bajo la licencia **CC BY-NC-ND 4.0**.
+
+- No se permite el uso comercial.
+- No se permite su modificación o redistribución.
+- El código puede visualizarse únicamente con fines académicos.
+
+🔗 [Ver términos de la licencia](https://creativecommons.org/licenses/by-nc-nd/4.0/)
