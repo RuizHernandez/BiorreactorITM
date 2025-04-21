@@ -15,10 +15,12 @@ import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 import math
 
+# ✅ Esto debe ir inmediatamente después de los imports
+st.set_page_config(page_title="BiorreactorITM: Simulación Cinética", layout="centered")
+
 # Mensaje visible de protección
 st.markdown("🔒 **Versión protegida para demostración científica. Código completo disponible bajo solicitud académica.**")
 
-st.set_page_config(page_title="BiorreactorITM: Simulación Cinética", layout="centered")
 st.title("🧪 BiorreactorITM: Simulación Cinética de *Pseudomonas*")
 
 def parse_input(text):
