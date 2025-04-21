@@ -1,43 +1,57 @@
 
-# Cinetica Biorreactor GUI
+# BiorreactorITM: Simulador cinético para *Pseudomonas reptilivora B-6bs*
 
-Este proyecto permite calcular parámetros cinéticos microbianos a partir de datos experimentales obtenidos en cultivos tipo batch, incluyendo:
+**Autor:** Itan Homero Ruiz Hernández  
+**Desarrollado con:** Python + Streamlit
+**Agradecimientos:** Dariana Berenice, Ana Karen, Karitza Barrios, Alexis Soria por su participación en prueba cerrada. 
 
-- Velocidad específica de crecimiento (μ)
-- Tiempo de duplicación (td)
-- Rendimiento Yxs
-- Tasa de consumo específico (qs)
-- Tasa máxima de crecimiento
-- Tasa máxima de consumo de sustrato
-- Tasa máxima de consumo de oxígeno
-- Estimación del coeficiente de transferencia de oxígeno (kLa)
+---
 
-## Contenido del paquete
+##  Descripción
 
-- `cinetica_biorreactor.py`: Script principal con interfaz gráfica para seleccionar archivos.
-- `datos_experimentales.csv`: Archivo de ejemplo con columnas requeridas.
+Esta aplicación permite realizar simulaciones cinéticas de crecimiento microbiano, consumo de sustrato, dinámica del oxígeno disuelto y producción de metabolitos secundarios (como antibióticos), usando datos experimentales y modelos matemáticos clásicos aplicados a *Pseudomonas reptilivora B-6bs* en un biorreactor tipo batch.
 
-## Requisitos
+Incluye interpretación automática, ajuste de parámetros, visualización interactiva y referencias científicas en formato APA.
 
-Instala las siguientes bibliotecas si no las tienes:
+---
+
+## Acceso rápido
+
+App en línea (Streamlit Cloud):  
+https://ruizhernandez.streamlit.app
+
+Repositorio:  
+https://github.com/RuizHernandez/BiorreactorITM
+
+---
+
+## Características principales
+
+- Cálculo de parámetros cinéticos:
+  - Tasa específica de crecimiento (μ)
+  - Tiempo de duplicación (td)
+  - Rendimiento biomasa/sustrato (Yxs)
+  - Tasa específica de consumo de sustrato (qS)
+  - Coeficiente kLa estimado
+
+- Simulación matemática:
+  - Modelo de Monod con limitación por sustrato y oxígeno
+  - Modelo de producción de metabolitos (Luedeking-Piret)
+  - Balance dinámico de oxígeno disuelto
+
+- Visualización:
+  - Gráficas interactivas
+  - Interpretaciones automáticas
+  - Ecuaciones en formato LaTeX
+  - Referencias científicas en formato APA 7
+
+---
+
+## 🛠Instalación local
 
 ```bash
-pip install numpy pandas matplotlib scipy
-```
+git clone https://github.com/[tu_usuario]/BiorreactorITM.git
+cd BiorreactorITM
+pip install -r requirements.txt
+streamlit run cinetica_app.py
 
-## Cómo usar
-
-1. Ejecuta el archivo `cinetica_biorreactor.py`.
-2. Se abrirá una ventana para seleccionar un archivo `.csv` con tus datos.
-3. El archivo debe tener las siguientes columnas:
-
-```
-tiempo, biomasa, sustrato, oxigeno
-```
-
-4. Al cargar el archivo, el script generará gráficos de:
-   - Crecimiento (biomasa)
-   - Consumo de sustrato
-   - Consumo de oxígeno
-
-5. Finalmente, mostrará una tabla con los resultados calculados.
