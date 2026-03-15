@@ -290,30 +290,182 @@ class HaldanePirtPiret:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 3 · VISUALIZACIÓN
+# SECCIÓN 3 · DATOS EXPERIMENTALES
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_experimental_data(filepath: str) -> dict:
+    """
+    Carga datos experimentales de un archivo CSV para compararlos con la
+    simulación.
+
+    Formato del CSV
+    ---------------
+    - Fila de encabezado obligatoria con nombres de columnas
+    - Columna obligatoria : t   — tiempo de muestreo (h)
+    - Columnas opcionales : X   — biomasa (g/L)
+                            S   — sustrato (g/L)
+                            P   — producto (g/L)
+    - Se aceptan celdas vacías (NaN) — útil cuando no todas las variables
+      se miden en cada punto de muestreo
+    - Se soportan separadores , y ;  (compatible con Excel en locale español)
+
+    Ejemplo de archivo válido
+    -------------------------
+    t,X,S,P
+    0.0,0.05,10.0,0.0
+    2.0,,9.4,
+    4.0,0.18,8.7,0.06
+    6.0,0.45,,0.14
+
+    Parámetros
+    ----------
+    filepath : str — ruta al archivo CSV (absoluta o relativa al script)
+
+    Retorna
+    -------
+    data : dict — diccionario con claves 't', 'X', 'S', 'P'.
+        Cada valor es un ndarray de float64 con NaN donde no hay medición.
+        La clave 't' siempre está presente; X, S, P solo si la columna existe.
+
+    Raises
+    ------
+    FileNotFoundError  — si el archivo no existe
+    ValueError         — si la columna 't' no está presente en el CSV
+    """
+    import os
+
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"Archivo de datos no encontrado: '{filepath}'")
+
+    # Detectar separador leyendo la primera línea
+    with open(filepath, encoding='utf-8-sig') as f:
+        primera = f.readline()
+    sep = ';' if primera.count(';') > primera.count(',') else ','
+
+    # Leer con numpy (sin dependencia de pandas)
+    with open(filepath, encoding='utf-8-sig') as f:
+        header = f.readline().strip().split(sep)
+        header = [h.strip().lower() for h in header]
+
+    if 't' not in header:
+        raise ValueError(
+            f"El CSV debe tener una columna 't' (tiempo). "
+            f"Columnas encontradas: {header}"
+        )
+
+    # Cargar datos numéricos (celdas vacías → NaN)
+    raw = np.genfromtxt(
+        filepath, delimiter=sep, skip_header=1,
+        filling_values=np.nan, encoding='utf-8-sig'
+    )
+    if raw.ndim == 1:
+        raw = raw.reshape(1, -1)
+
+    data: dict = {}
+    for i, col in enumerate(header):
+        if col in ('t', 'x', 's', 'p'):
+            data[col.upper() if col != 't' else 't'] = raw[:, i]
+
+    # Renombrar para consistencia (t siempre minúscula)
+    if 't' not in data:
+        data['t'] = raw[:, header.index('t')]
+
+    return data
+
+
+def generate_demo_csv(
+    model: HaldanePirtPiret,
+    sol,
+    filepath: str = 'datos_experimentales_ejemplo.csv',
+    n_muestras: int = 12,
+    ruido_rel: float = 0.06,
+    seed: int = 42,
+) -> str:
+    """
+    Genera un CSV de ejemplo con datos sintéticos ruidosos a partir de la
+    simulación, para demostrar el flujo de carga de datos experimentales.
+
+    Los datos simulan mediciones reales con:
+    - Ruido gaussiano relativo (cv = ruido_rel)
+    - Puntos de muestreo equiespaciados en el intervalo simulado
+    - Algunas mediciones de P omitidas (NaN) para mayor realismo
+
+    Parámetros
+    ----------
+    model      : HaldanePirtPiret — modelo usado para la simulación base
+    sol        : OdeResult        — resultado de solve_ivp
+    filepath   : str              — ruta de salida del CSV
+    n_muestras : int              — número de puntos de muestreo
+    ruido_rel  : float            — coeficiente de variación del ruido (0–1)
+    seed       : int              — semilla para reproducibilidad
+
+    Retorna
+    -------
+    filepath : str — ruta del archivo generado
+    """
+    rng = np.random.default_rng(seed)
+    t_muestras = np.linspace(sol.t[0], sol.t[-1], n_muestras)
+
+    # Interpolar la simulación en los tiempos de muestreo
+    X_sim = np.interp(t_muestras, sol.t, sol.y[0])
+    S_sim = np.interp(t_muestras, sol.t, sol.y[1])
+    P_sim = np.interp(t_muestras, sol.t, sol.y[2])
+
+    # Agregar ruido gaussiano relativo
+    def _noisy(arr):
+        noise = rng.normal(0, ruido_rel, size=arr.shape)
+        return np.maximum(arr * (1 + noise), 0.0)
+
+    X_exp = _noisy(X_sim)
+    S_exp = _noisy(S_sim)
+    P_exp = _noisy(P_sim)
+
+    # Simular que P no se midió en ~30% de los puntos
+    mask_p = rng.random(n_muestras) < 0.30
+    P_exp[mask_p] = np.nan
+
+    # Escribir CSV
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write('t,X,S,P\n')
+        for i in range(n_muestras):
+            p_str = f'{P_exp[i]:.4f}' if not np.isnan(P_exp[i]) else ''
+            f.write(f'{t_muestras[i]:.2f},{X_exp[i]:.4f},{S_exp[i]:.4f},{p_str}\n')
+
+    print(f'    → CSV de ejemplo generado: {filepath}  ({n_muestras} muestras)')
+    return filepath
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECCIÓN 4 · VISUALIZACIÓN
 # ─────────────────────────────────────────────────────────────────────────────
 
 def plot_simulation(
     model: HaldanePirtPiret,
     sol,
+    exp_data: dict | None = None,
     fig_path: str = 'biorreactor_simulacion.png',
     dpi: int = 300,
 ) -> plt.Figure:
     """
-    Genera figura de 4 subplots (2×2) con los resultados de la simulación.
+    Genera figura de 4 subplots (2×2) con los resultados de la simulación
+    y, opcionalmente, superpone datos experimentales como puntos de dispersión.
 
-    ┌────────────────────────┬────────────────────────┐
-    │ [0,0] Curva Haldane    │ [0,1] X y S vs tiempo  │
-    │       μ(S) vs S        │       (doble eje Y)     │
-    ├────────────────────────┼────────────────────────┤
-    │ [1,0] P vs tiempo      │ [1,1] dS/dt y dP/dt    │
-    │       (L-P type)       │       tasas instánt.   │
-    └────────────────────────┴────────────────────────┘
+    Layout
+    ------
+    [0,0] Curva de Haldane μ(S) vs S
+    [0,1] Biomasa X y Sustrato S vs tiempo  (+datos exp si exp_data tiene X/S)
+    [1,0] Producto P vs tiempo              (+datos exp si exp_data tiene P)
+    [1,1] Tasas instantáneas dS/dt y dP/dt
 
     Parámetros
     ----------
     model    : HaldanePirtPiret — instancia con parámetros del modelo
     sol      : OdeResult        — resultado de solve_ivp (.t, .y)
+    exp_data : dict | None      — datos experimentales cargados con
+                                  load_experimental_data().
+                                  Claves esperadas: 't' (obligatoria),
+                                  'X', 'S', 'P' (opcionales, pueden tener NaN).
+                                  Si es None, no se grafican datos experimentales.
     fig_path : str              — ruta de salida de la figura PNG
     dpi      : int              — resolución de exportación (puntos/pulgada)
 
@@ -442,24 +594,50 @@ def plot_simulation(
     ax01_twin = ax01.twinx()
 
     lX, = ax01.plot(t, X, color=C['azul'], lw=2.2,
-                    label='Biomasa X (g/L)')
+                    label='Biomasa X  (sim.)')
     lS, = ax01_twin.plot(t, S, color=C['naranja'], lw=2.2, ls='--',
-                          label='Sustrato S (g/L)')
+                          label='Sustrato S  (sim.)')
+
+    # ── Superponer datos experimentales de X y S ──────────────────────────
+    legend_handles = [lX, lS]
+    if exp_data is not None:
+        t_e = exp_data['t']
+        if 'X' in exp_data:
+            mask = ~np.isnan(exp_data['X'])
+            eX = ax01.scatter(
+                t_e[mask], exp_data['X'][mask],
+                color=C['azul'], s=55, zorder=6,
+                marker='o', edgecolors='white', linewidths=0.8,
+                label='X  (exp.)'
+            )
+            legend_handles.append(eX)
+        if 'S' in exp_data:
+            mask = ~np.isnan(exp_data['S'])
+            eS = ax01_twin.scatter(
+                t_e[mask], exp_data['S'][mask],
+                color=C['naranja'], s=55, zorder=6,
+                marker='s', edgecolors='white', linewidths=0.8,
+                label='S  (exp.)'
+            )
+            legend_handles.append(eS)
 
     ax01.set_xlabel('Tiempo (h)')
     ax01.set_ylabel('Biomasa X (g/L)', color=C['azul'], fontweight='bold')
     ax01_twin.set_ylabel('Sustrato S (g/L)', color=C['naranja'], fontweight='bold')
     ax01.tick_params(axis='y', colors=C['azul'])
     ax01_twin.tick_params(axis='y', colors=C['naranja'])
-    ax01.set_title('Biomasa y Sustrato vs Tiempo')
+    titulo_xs = 'Biomasa y Sustrato vs Tiempo'
+    if exp_data is not None:
+        titulo_xs += '  [+datos exp.]'
+    ax01.set_title(titulo_xs)
     ax01.set_xlim(left=0)
     ax01.set_ylim(bottom=0)
     ax01_twin.set_ylim(bottom=0)
 
-    # Leyenda combinada
+    # Leyenda combinada (simulación + experimento)
     ax01.legend(
-        [lX, lS],
-        [lX.get_label(), lS.get_label()],
+        legend_handles,
+        [h.get_label() for h in legend_handles],
         loc='center right', fontsize=9
     )
 
@@ -479,12 +657,25 @@ def plot_simulation(
         'mixed':     'Mixto — dP/dt = α · dX/dt + β · X',
     }
     ax10.plot(t, P, color=C['magenta'], lw=2.2,
-              label=etiquetas_lp[model.metabolite_type])
+              label=etiquetas_lp[model.metabolite_type] + '  (sim.)')
     ax10.fill_between(t, P, alpha=0.12, color=C['magenta'])
+
+    # ── Superponer datos experimentales de P ──────────────────────────────
+    if exp_data is not None and 'P' in exp_data:
+        mask = ~np.isnan(exp_data['P'])
+        ax10.scatter(
+            exp_data['t'][mask], exp_data['P'][mask],
+            color=C['magenta'], s=60, zorder=6,
+            marker='D', edgecolors='white', linewidths=0.8,
+            label='P  (exp.)'
+        )
 
     ax10.set_xlabel('Tiempo (h)')
     ax10.set_ylabel('Concentración de producto P (g/L)')
-    ax10.set_title('Formación de Producto — Luedeking-Piret')
+    titulo_p = 'Formación de Producto — Luedeking-Piret'
+    if exp_data is not None and 'P' in exp_data:
+        titulo_p += '  [+datos exp.]'
+    ax10.set_title(titulo_p)
     ax10.legend(loc='upper left', fontsize=9)
     ax10.set_xlim(left=0)
     ax10.set_ylim(bottom=0)
@@ -514,7 +705,7 @@ def plot_simulation(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 4 · TABLA RESUMEN
+# SECCIÓN 5 · TABLA RESUMEN
 # ─────────────────────────────────────────────────────────────────────────────
 
 def print_summary_table(results: list[dict]) -> None:
@@ -549,22 +740,27 @@ def print_summary_table(results: list[dict]) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 5 · BLOQUE PRINCIPAL  (__main__)
+# SECCIÓN 6 · BLOQUE PRINCIPAL  (__main__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     """
     Ejecuta tres simulaciones secuenciales (primario → mixto → secundario),
-    genera una figura PNG para cada una y finaliza con una tabla resumen.
+    genera figuras PNG individuales, y finaliza con:
+    - Figura adicional del tipo 'mixed' comparada con datos experimentales
+      (generados automáticamente como CSV de ejemplo con ruido sintético)
+    - Tabla resumen comparativa de las tres simulaciones
     """
 
     print('\n' + '=' * 60)
-    print('  BiorreactorITM — Simulación Haldane · Pirt · Luedeking-Piret')
+    print('  BiorreactorITM — Simulación Haldane + Pirt + Luedeking-Piret')
     print('  Applikon 3.0 L  |  Batch  |  2.0 L volumen de trabajo')
     print('=' * 60)
 
     tipos_metabolito = ['primary', 'mixed', 'secondary']
-    resultados = []
+    resultados  = []
+    sol_mixed   = None   # guardar para la comparación con datos exp.
+    model_mixed = None
 
     for tipo in tipos_metabolito:
         print(f'\n{"─"*60}')
@@ -602,7 +798,12 @@ if __name__ == '__main__':
             'Y_obs':   Y_obs,
         })
 
-        # ── Visualización individual ──────────────────────────────────────────
+        # Guardar simulación 'mixed' para la comparación posterior
+        if tipo == 'mixed':
+            sol_mixed   = sol
+            model_mixed = model
+
+        # ── Figura sin datos experimentales ───────────────────────────────────
         fig = plot_simulation(
             model    = model,
             sol      = sol,
@@ -611,6 +812,42 @@ if __name__ == '__main__':
         )
         plt.show()
         plt.close(fig)
+
+    # ── Comparación simulación vs datos experimentales (tipo mixed) ───────────
+    print(f'\n{"─"*60}')
+    print('  Generando figura de comparación sim. vs datos experimentales')
+    print(f'{"─"*60}')
+
+    # Generar CSV de ejemplo con datos sintéticos ruidosos (CV = 6%)
+    csv_path = generate_demo_csv(
+        model    = model_mixed,
+        sol      = sol_mixed,
+        filepath = 'datos_experimentales_ejemplo.csv',
+        n_muestras = 12,
+        ruido_rel  = 0.06,
+    )
+
+    # Cargar el CSV generado
+    exp_data = load_experimental_data(csv_path)
+    print(f'    → Datos cargados: {len(exp_data["t"])} puntos de muestreo')
+    columnas = [k for k in exp_data if k != 't']
+    print(f'    → Variables medidas: {", ".join(columnas)}')
+
+    # Figura con superposición de datos experimentales
+    fig_exp = plot_simulation(
+        model    = model_mixed,
+        sol      = sol_mixed,
+        exp_data = exp_data,
+        fig_path = 'biorreactor_simulacion_mixed_vs_exp.png',
+        dpi      = 300,
+    )
+    plt.show()
+    plt.close(fig_exp)
+
+    print(f'\n  Para usar tus propios datos experimentales:')
+    print(f'    1. Crea un CSV con columnas: t, X, S, P  (P es opcional)')
+    print(f'    2. Llama: exp_data = load_experimental_data("tu_archivo.csv")')
+    print(f'    3. Pasa exp_data a plot_simulation(..., exp_data=exp_data, ...)')
 
     # ── Tabla comparativa final ───────────────────────────────────────────────
     print_summary_table(resultados)
